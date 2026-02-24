@@ -43,6 +43,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         product = get_object_or_404(Product, id=serializer.validated_data['product_id'])
         quantity = serializer.validated_data['quantity']
         
+        # Проверка наличия товара (без списания)
+        if product.quantity < quantity:
+            return Response(
+                {'error': f'Недостаточно товара. Доступно: {product.quantity}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         cart, _ = Order.objects.get_or_create(
             user=request.user,
             status='basket'
@@ -59,8 +66,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             order_item.quantity += quantity
             order_item.save()
         
-        product.quantity -= quantity
-        product.save()
+        # НЕ УМЕНЬШАЕМ КОЛИЧЕСТВО ТОВАРА НА СКЛАДЕ
+        # Товар резервируется только при подтверждении заказа
         
         return Response(OrderSerializer(cart).data)
     
@@ -78,10 +85,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         item = get_object_or_404(OrderItem, order=cart, product_id=product_id)
         
-        product = item.product
-        product.quantity += item.quantity
-        product.save()
-        
+        # НЕ ВОЗВРАЩАЕМ ТОВАР НА СКЛАД, ТАК КАК ОН НЕ БЫЛ СПИСАН
         item.delete()
         
         return Response(OrderSerializer(cart).data)
@@ -96,10 +100,25 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = OrderConfirmSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
+        # Проверка наличия всех товаров перед списанием
+        for item in cart.items.all():
+            product = item.product
+            if product.quantity < item.quantity:
+                return Response({
+                    'error': f'Товара "{product.name}" недостаточно на складе. Доступно: {product.quantity}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # СПИСЫВАЕМ ТОВАРЫ СО СКЛАДА
+        for item in cart.items.all():
+            product = item.product
+            product.quantity -= item.quantity
+            product.save()
+        
         cart.contact_id = serializer.validated_data['contact_id']
         cart.status = 'new'
         cart.save()
         
+        # Отправка email клиенту
         send_mail(
             'Подтверждение заказа',
             f'Здравствуйте, {request.user.username}!\n\n'
@@ -112,6 +131,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             fail_silently=False,
         )
         
+        # Отправка email администратору
         send_mail(
             f'Новый заказ №{cart.id}',
             f'Новый заказ от пользователя {request.user.username}\n'
@@ -135,7 +155,35 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = OrderStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        order.status = serializer.validated_data['status']
+        old_status = order.status
+        new_status = serializer.validated_data['status']
+        order.status = new_status
         order.save()
         
-        send_mail
+        # Если заказ отменяется - возвращаем товары на склад
+        if new_status == 'canceled' and old_status != 'canceled':
+            for item in order.items.all():
+                product = item.product
+                product.quantity += item.quantity
+                product.save()
+        
+        # Отправка уведомления клиенту
+        send_mail(
+            f'Статус заказа №{order.id} изменен',
+            f'Здравствуйте, {order.user.username}!\n\n'
+            f'Статус вашего заказа №{order.id} изменен на: {order.get_status_display()}',
+            settings.EMAIL_HOST_USER,
+            [order.user.email],
+            fail_silently=False,
+        )
+        
+        return Response({
+            'status': order.status,
+            'message': 'Статус заказа успешно обновлен'
+        })
+    
+    @action(detail=True, methods=['get'])
+    def details(self, request, pk=None):
+        order = self.get_object()
+        serializer = OrderSerializer(order)
+        return Response(serializer.data)

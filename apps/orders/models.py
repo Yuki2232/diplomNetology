@@ -31,6 +31,10 @@ class Order(models.Model):
     @property
     def total_sum(self):
         return sum(item.total_sum for item in self.items.all())
+    
+    @property
+    def total_quantity(self):
+        return sum(item.quantity for item in self.items.all())
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -43,6 +47,9 @@ class OrderItem(models.Model):
         verbose_name = 'Позиция заказа'
         verbose_name_plural = 'Позиции заказов'
         unique_together = [['order', 'product', 'shop']]
+    
+    def __str__(self):
+        return f"{self.product.name} - {self.quantity} шт."
     
     @property
     def total_sum(self):

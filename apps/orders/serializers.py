@@ -7,10 +7,11 @@ from apps.users.serializers import ContactSerializer
 class OrderItemSerializer(serializers.ModelSerializer):
     product_details = ProductSerializer(source='product', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    shop_name = serializers.CharField(source='shop.name', read_only=True)
     
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_details', 'product_name', 'quantity', 'price', 'total_sum']
+        fields = ['id', 'product', 'product_details', 'product_name', 'shop', 'shop_name', 'quantity', 'price', 'total_sum']
         read_only_fields = ['id']
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -19,15 +20,15 @@ class OrderSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Order
-        fields = ['id', 'user', 'contact', 'contact_details', 'status', 'items', 'total_sum', 'created_at']
-        read_only_fields = ['id', 'user', 'created_at']
+        fields = ['id', 'user', 'contact', 'contact_details', 'status', 'items', 'total_sum', 'total_quantity', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
 
 class OrderListSerializer(serializers.ModelSerializer):
     total_sum = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Order
-        fields = ['id', 'status', 'total_sum', 'created_at']
+        fields = ['id', 'status', 'total_sum', 'total_quantity', 'created_at']
 
 class AddToCartSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
@@ -39,7 +40,8 @@ class AddToCartSerializer(serializers.Serializer):
         except Product.DoesNotExist:
             raise serializers.ValidationError("Товар не найден")
         
-        if product.quantity < self.initial_data.get('quantity', 1):
+        quantity = self.initial_data.get('quantity', 1)
+        if product.quantity < quantity:
             raise serializers.ValidationError(f"Доступно только {product.quantity} шт.")
         
         return value

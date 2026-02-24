@@ -1,8 +1,84 @@
-
+# Python
 venv/
+env/
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+*.log
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.hypothesis
+.pytest_cache/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
 media/
+staticfiles/
+.Django_static/
+
+# Environment
+.env
+.venv
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-EOF
+.project
+.pydevproject
+.settings/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Database
+*.sql
+*.sqlite
+*.sqlite3
+
+# Uploads
+/media/
+/uploads/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+myvenv/
+virt/
+venv.bak/
+env.bak/
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# Прочее
+README.md
+backup.sql
