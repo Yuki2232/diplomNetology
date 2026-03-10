@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+import uuid
 
 class User(AbstractUser):
     USER_TYPE_CHOICES = (
@@ -11,6 +13,8 @@ class User(AbstractUser):
     company_name = models.CharField(max_length=255, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(unique=True)
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_token = models.CharField(max_length=100, blank=True, null=True)
     
     class Meta:
         verbose_name = 'Пользователь'
@@ -18,6 +22,11 @@ class User(AbstractUser):
     
     def __str__(self):
         return f"{self.username}"
+    
+    def generate_verification_token(self):
+        self.email_verification_token = str(uuid.uuid4())
+        self.save()
+        return self.email_verification_token
 
 class Contact(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts')

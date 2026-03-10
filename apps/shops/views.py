@@ -24,6 +24,28 @@ class ShopViewSet(viewsets.ModelViewSet):
             return self.queryset.filter(id=user.shop.id)
         return self.queryset
     
+    def create(self, request, *args, **kwargs):
+        # Проверяем, что пользователь - поставщик
+        if request.user.user_type != 'supplier':
+            return Response(
+                {'error': 'Только поставщики могут создавать магазины'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Проверяем, что у пользователя еще нет магазина
+        if hasattr(request.user, 'shop'):
+            return Response(
+                {'error': 'У вас уже есть магазин'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Создаем магазин
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     @action(detail=True, methods=['post'])
     def toggle_status(self, request, pk=None):
         shop = self.get_object()

@@ -7,6 +7,8 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth import get_user_model
 from apps.users.models import Contact
 from apps.users.serializers import UserSerializer, RegisterSerializer, ContactSerializer, ContactCreateSerializer
+from apps.shops.models import Shop
+from apps.shops.serializers import ShopSerializer
 
 User = get_user_model()
 
@@ -20,7 +22,8 @@ class CustomAuthToken(ObtainAuthToken):
             'token': token.key,
             'user_id': user.pk,
             'username': user.username,
-            'user_type': user.user_type
+            'user_type': user.user_type,
+            'is_email_verified': user.is_email_verified
         })
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -37,6 +40,34 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def become_supplier(self, request):
+        user = request.user
+        
+        if user.user_type == 'supplier':
+            return Response({'error': 'Вы уже являетесь поставщиком'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user.is_email_verified:
+            return Response({'error': 'Необходимо подтвердить email'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.user_type = 'supplier'
+        user.save()
+        
+        # Создаем магазин автоматически или возвращаем успех
+        if not hasattr(user, 'shop'):
+            shop = Shop.objects.create(
+                name=f"Магазин {user.username}",
+                user=user,
+                is_active=True
+            )
+            serializer = ShopSerializer(shop)
+            return Response({
+                'message': 'Вы стали поставщиком',
+                'shop': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        return Response({'message': 'Вы стали поставщиком'}, status=status.HTTP_200_OK)
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
